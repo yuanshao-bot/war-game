@@ -57,6 +57,11 @@ export function seedVision(fog, pCity, eCity) {
 
 export function refreshFog(fog, units) {
   fog.visible = calcVis(units, "P");
-  fog.visible.forEach((k) => fog.explored.add(k));
+  if (!fog.seen) fog.seen = new Set();
+  for (const k of fog.explored) {
+    if (fog.seed.has(k) || fog.seen.has(k)) fog.visible.add(k);
+    fog.seen.add(k);
+  }
+  fog.visible.forEach((k) => { fog.explored.add(k); fog.seen.add(k); });
   fog.seed.forEach((k) => { fog.visible.add(k); fog.explored.add(k); });
 }
