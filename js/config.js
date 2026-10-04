@@ -1,4 +1,4 @@
-// 所有数值规则集中在此。改数值不用碰逻辑。
+﻿// 所有数值规则集中在此。改数值不用碰逻辑。
 export const CS = 24;        // 每格像素
 export const W = 60, H = 60; // 地图格数
 
@@ -63,8 +63,17 @@ export const CITIES = { count: 14, minDist: 7, seed: 7 };
 // 迷雾 / 种子视野
 export const FOG = { refreshSec: 0.3, seedRadius: 12 };
 
-// AI
-export const AI = { thinkSec: 0.4, retreatHp: 0.4, retreatAmmo: 0.3 };
+// AI 行为
+export const AI = {
+  thinkSec: 0.4,        // 决策间隔
+  retreatHp: 0.4,       // 血量 < 40% 撤退
+  retreatAmmo: 0.3,     // 弹药 < 30% 撤退
+  incomeFactor: 0.8,    // AI 资金收入 = 玩家 x 0.8
+  recruitType: "infantry", // 优先招募兵种
+  recruitEvery: 0,      // 招募间隔(秒), 0=不限
+  seize: true,          // 是否主动夺城市
+  seizeRange: 40,       // 夺城市距离上限(格)
+};
 
 // 相机
 export const CAM = { followSpeed: 500, panStep: 500, fastMult: 2 };
