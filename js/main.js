@@ -34,6 +34,12 @@ seedVision(fog, pCity, eCity);
 const cam = makeCamera();
 makeAI();
 centerOn(cam, canvas);
+// 开局相机对准玩家基地(而非地图中央), 避免全黑
+(function () {
+  cam.offX = Math.floor((pCity.x * CS + CS / 2 - canvas.width / 2));
+  cam.offY = Math.floor(pCity.y * CS + CS / 2 - canvas.height / 2);
+  clamp(cam, canvas);
+})();
 const eco = makeEconomy();
 const keys = attach(canvas, state, cam);
 
