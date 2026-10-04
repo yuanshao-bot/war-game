@@ -27,7 +27,7 @@ const units = [
   makeUnit("fighter", "E", eCity.x, eCity.y + 1),
 ];
 
-const state = { units, selected: null, moveTarget: null, dragBox: null, cityOwner: null };
+const state = { units, selected: null, moveTarget: null, dragBox: null, cityOwner: ownerOf(units) };
 
 const fog = makeFog();
 seedVision(fog, pCity, eCity);
@@ -50,22 +50,8 @@ function logMsg(m) {
 let lastLog = "", lastLogT = 0;
 
 function recruitNow(type) {
-  if (eco.money < ROST[type]) { logMsg("资金不足(" + ROST[type] + ")"); return; }
-  const citySet = new Set();
-  for (const u of units) {
-    if (u.owner === "P" && u.alive && isCity(Math.round(u.x), Math.round(u.y)))
-      citySet.add(Math.round(u.x) + "," + Math.round(u.y));
-  }
-  if (citySet.size === 0) { logMsg("需要己方单位站在城市里"); return; }
-  for (const key of citySet) {
-    const co = state.cityOwner ? state.cityOwner[key] : null;
-    if (co && co.owner === "P") {
-      const targetCity = allCities().find((cc) => key === cc.x + "," + cc.y) || allCities()[0];
-      const spawned = doRecruit(eco, units, state.cityOwner, logMsg, type, targetCity);
-      if (spawned) { state.cityOwner = ownerOf(units); return; }
-    }
-  }
-  logMsg("你所在的城市都不是你的(需己方城市归属P才能招募)");
+  const nu = doRecruit(eco, units, state.cityOwner, logMsg, type);
+  if (nu) state.cityOwner = ownerOf(units);
 }
 document.getElementById("recInf").onclick = () => recruitNow("infantry");
 // 日志折叠
