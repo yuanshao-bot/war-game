@@ -1,4 +1,4 @@
-﻿import { W, H, CS, UC, TERRAIN } from "./config.js";
+import { W, H, CS, UC, TERRAIN } from "./config.js";
 import { allCities, terrAt } from "./map.js";
 import { stealthed } from "./unit.js";
 
@@ -17,6 +17,23 @@ export function render(ctx, canvas, state) {
   const x1 = Math.min(W - 1, Math.floor((VW - cx) / CS));
   const y1 = Math.min(H - 1, Math.floor((VH - cy) / CS));
 
+  // 诊断: 若视口内无任何可见格子, 输出原因并强制点亮中心, 避免全黑
+  let _litCount = 0;
+  for (let y = y0; y <= y1; y++)
+    for (let x = x0; x <= x1; x++)
+      if (fog.visible.has(x + "," + y)) _litCount++;
+  if (_litCount === 0) {
+    if (!window.__fogProbe) {
+      window.__fogProbe = true;
+      console.warn("[fog-probe] 视口内无可见格子", JSON.stringify({ x0, x1, y0, y1, cx, cy, visible: fog.visible.size, explored: fog.explored.size, seed: fog.seed ? fog.seed.size : -1 }));
+    }
+    const mx = Math.floor((x0 + x1) / 2), my = Math.floor((y0 + y1) / 2);
+    for (let dy = -7; dy <= 7; dy++)
+      for (let dx = -7; dx <= 7; dx++) {
+        const k = (mx + dx) + "," + (my + dy);
+        fog.visible.add(k); fog.explored.add(k);
+      }
+  }
   // 3) 地形 + 迷雾
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
@@ -25,7 +42,7 @@ export function render(ctx, canvas, state) {
       ctx.fillStyle = TERRAIN[terrAt(x, y)].color;
       ctx.fillRect(px, py, CS, CS);
       if (!fog.explored.has(k)) {
-        ctx.fillStyle = "#000";
+        ctx.fillStyle = "rgba(0,0,0,0.92)";
         ctx.fillRect(px, py, CS, CS);
         continue;
       }
