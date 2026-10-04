@@ -33,12 +33,20 @@ export function render(ctx, canvas, state) {
       ctx.strokeRect(c, c2, CS, CS);
     }
 
-  // 城市边框（仅已探索/可见）
+  // 城市边框（仅当该城市 3x3 全部已探索/可见时才画，避免黑雾露出）
   for (const c of allCities()) {
     const ck = c.x + "," + c.y;
     const o = cityOwner ? cityOwner[ck] : null;
     if (!o) continue;
-    if (!fog.explored.has(ck) && !fog.visible.has(ck)) continue;
+    // 检查 3x3 是否全部可见
+    let lit = 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = c.x + dx, ny = c.y + dy;
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+        if (fog.visible.has(nx + "," + ny)) lit++;
+      }
+    if (lit < 9) continue; // 没全亮就不画边框
     let bx = (c.x - 1) * CS - cx, by = (c.y - 1) * CS - cy;
     let bw = CS * 3 - 2, bh = CS * 3 - 2;
     if (bx < 0) { bw -= -bx; bx = 0; }
@@ -123,3 +131,4 @@ export function render(ctx, canvas, state) {
     ctx.setLineDash([]);
   }
 }
+
