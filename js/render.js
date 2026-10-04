@@ -7,7 +7,7 @@ export function render(ctx, canvas, state) {
   const VW = canvas.width, VH = canvas.height;
   const cx = cam.offX, cy = cam.offY;
 
-  // 1) 整块填黑底（地图外画布区域保持黑）
+  // 1) 整块黑底
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, VW, VH);
 
@@ -17,23 +17,6 @@ export function render(ctx, canvas, state) {
   const x1 = Math.min(W - 1, Math.ceil((cx + VW) / CS) - 1);
   const y1 = Math.min(H - 1, Math.ceil((cy + VH) / CS) - 1);
 
-  // 诊断: 若视口内无任何可见格子, 输出原因并强制点亮中心, 避免全黑
-  let _litCount = 0;
-  for (let y = y0; y <= y1; y++)
-    for (let x = x0; x <= x1; x++)
-      if (fog.visible.has(x + "," + y)) _litCount++;
-  if (_litCount === 0) {
-    if (!window.__fogProbe) {
-      window.__fogProbe = true;
-      console.warn("[fog-probe] 视口内无可见格子", JSON.stringify({ x0, x1, y0, y1, cx, cy, visible: fog.visible.size, explored: fog.explored.size, seed: fog.seed ? fog.seed.size : -1 }));
-    }
-    const mx = Math.floor((x0 + x1) / 2), my = Math.floor((y0 + y1) / 2);
-    for (let dy = -7; dy <= 7; dy++)
-      for (let dx = -7; dx <= 7; dx++) {
-        const k = (mx + dx) + "," + (my + dy);
-        fog.visible.add(k); fog.explored.add(k);
-      }
-  }
   // 3) 地形 + 迷雾
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
@@ -47,14 +30,14 @@ export function render(ctx, canvas, state) {
         continue;
       }
       if (!fog.visible.has(k)) {
-        ctx.fillStyle = "rgba(60,60,60,0.55)"; // 探索后变灰而非纯黑
+        ctx.fillStyle = "rgba(60,60,60,0.55)";
         ctx.fillRect(px, py, CS, CS);
       }
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
       ctx.strokeRect(px, py, CS, CS);
     }
 
-  // 4) 城市边框（仅 3x3 全可见才画）
+  // 4) 城市边框(3x3 全可见才画)
   for (const c of allCities()) {
     const ck = c.x + "," + c.y;
     const o = cityOwner ? cityOwner[ck] : null;
@@ -80,7 +63,7 @@ export function render(ctx, canvas, state) {
     ctx.lineWidth = 1;
   }
 
-  // 5) 选中范围圈（单选）
+  // 5) 选中范围圈
   if (selected && !Array.isArray(selected) && selected.alive) {
     const r = UC[selected.type].range * CS;
     ctx.beginPath();
@@ -92,7 +75,7 @@ export function render(ctx, canvas, state) {
     ctx.fill();
   }
 
-  // 6) 移动目标连线(多选: 每个单位各画一条到同一点; 框选虚线框见第 8 节)
+  // 6) 移动目标连线(多选: 每个单位各画一条)
   if (selected && moveTarget) {
     const grp = (Array.isArray(selected) ? selected : [selected]).filter(u => u.alive);
     const tx = moveTarget.x * CS + CS / 2 - cx, ty = moveTarget.y * CS + CS / 2 - cy;
@@ -111,7 +94,6 @@ export function render(ctx, canvas, state) {
     ctx.fillStyle = "rgba(79,195,247,0.9)";
     ctx.beginPath(); ctx.arc(tx, ty, 3, 0, 7); ctx.fill();
     ctx.restore();
-  }
   }
 
   // 7) 单位
@@ -144,14 +126,16 @@ export function render(ctx, canvas, state) {
     }
   }
 
-  // 8) 框选矩形
+  // 8) 框选虚线
   if (dragBox && dragBox.moved) {
-    const bx = Math.min(dragBox.px0, dragBox.px1), by = Math.min(dragBox.py0, dragBox.py1);
-    const bw = Math.abs(dragBox.px1 - dragBox.px0), bh = Math.abs(dragBox.py1 - dragBox.py0);
+    const bx = Math.min(dragBox.px0, dragBox.px1) - cx;
+    const by = Math.min(dragBox.py0, dragBox.py1) - cy;
+    const bw = Math.abs(dragBox.px1 - dragBox.px0);
+    const bh = Math.abs(dragBox.py1 - dragBox.py0);
     ctx.strokeStyle = "#4fc3f7"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
-    ctx.strokeRect(bx - cx, by - cy, bw, bh);
-    ctx.fillStyle = "rgba(79,195,247,0.08)";
-    ctx.fillRect(bx - cx, by - cy, bw, bh);
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = "rgba(79,195,247,0.18)";
+    ctx.fillRect(bx, by, bw, bh);
     ctx.setLineDash([]);
   }
 }
