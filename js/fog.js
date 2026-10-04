@@ -37,8 +37,7 @@ export function ownerOf(units) {
 // 开局种子视野：点亮玩家基地 + 地图中央(重叠成一大片, 覆盖初始视口); 敌方城市初始全黑
 export function seedVision(fog, pCity, eCity) {
   const centers = [];
-  if (pCity) centers.push(pCity);
-  centers.push({ x: Math.floor(W / 2), y: Math.floor(H / 2) });
+  if (pCity) centers.push(pCity); // 只点亮玩家基地城市
   const R = FOG.seedRadius;
   for (const c of centers) {
     for (let y = c.y - R; y <= c.y + R; y++)
