@@ -1,5 +1,5 @@
 import { UC, CN, TERRAIN, FOG, AI, ROST, DECAY, W, H, CS } from "./config.js";
-import { allCities, terrAt } from "./map.js";
+import { allCities, terrAt, isCity } from "./map.js";
 import { makeUnit, resetUid, tickExposure, moveUnit, setPath } from "./unit.js";
 import { findTarget, fire } from "./combat.js";
 import { makeFog, refreshFog, ownerOf, seedVision } from "./fog.js";
@@ -46,9 +46,22 @@ function logMsg(m) {
 }
 
 function recruitNow(type) {
-  if (eco.money < ROST[type]) { logMsg("资金不足"); return; }
-  const ok = doRecruit(eco, units, state.cityOwner, logMsg);
-  if (ok) state.cityOwner = ownerOf(units);
+  if (eco.money < ROST[type]) { logMsg("资金不足(" + ROST[type] + ")"); return; }
+  const citySet = new Set();
+  for (const u of units) {
+    if (u.owner === "P" && u.alive && isCity(Math.round(u.x), Math.round(u.y)))
+      citySet.add(Math.round(u.x) + "," + Math.round(u.y));
+  }
+  if (citySet.size === 0) { logMsg("需要己方单位站在城市里"); return; }
+  for (const key of citySet) {
+    const co = state.cityOwner ? state.cityOwner[key] : null;
+    if (co && co.owner === "P") {
+      const targetCity = allCities().find((cc) => key === cc.x + "," + cc.y) || allCities()[0];
+      const spawned = doRecruit(eco, units, state.cityOwner, logMsg, type, targetCity);
+      if (spawned) { state.cityOwner = ownerOf(units); return; }
+    }
+  }
+  logMsg("你所在的城市都不是你的(需己方城市归属P才能招募)");
 }
 document.getElementById("recInf").onclick = () => recruitNow("infantry");
 document.getElementById("recTank").onclick = () => recruitNow("tank");
