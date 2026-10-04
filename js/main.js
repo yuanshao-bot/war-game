@@ -1,20 +1,20 @@
-import { UC, CN, TERRAIN, FOG, AI, ROST, DECAY } from "./config.js";
+import { UC, CN, TERRAIN, FOG, AI, ROST, DECAY, W, H, CS } from "./config.js";
 import { allCities, terrAt } from "./map.js";
 import { makeUnit, resetUid, tickExposure, moveUnit, setPath } from "./unit.js";
 import { findTarget, fire } from "./combat.js";
 import { makeFog, refreshFog, ownerOf, seedVision } from "./fog.js";
 import { makeEconomy, tickIncome, addKillReward, recruit as doRecruit } from "./economy.js";
 import { think as aiThink } from "./ai.js";
-import { makeCamera, centerOn, follow, step as camStep } from "./camera.js";
+import { makeCamera, centerOn, follow, step as camStep, clamp } from "./camera.js";
 import { render } from "./render.js";
 import { attach } from "./input.js";
+import { drawMinimap, minimapToWorld } from "./minimap.js";
 
 // ===== 启动 =====
 const canvas = document.getElementById("cv");
 const ctx = canvas.getContext("2d");
 resetUid();
 
-// 起始单位：最南/最北城市部署
 const sorted = [...allCities()].sort((a, b) => a.y - b.y);
 const pCity = sorted[sorted.length - 1];
 const eCity = sorted[0];
@@ -27,17 +27,10 @@ const units = [
   makeUnit("fighter", "E", eCity.x, eCity.y + 1),
 ];
 
-// 共享状态
-const state = {
-  units,
-  selected: null,
-  moveTarget: null,
-  dragBox: null,
-  cityOwner: null,
-};
+const state = { units, selected: null, moveTarget: null, dragBox: null, cityOwner: null };
 
 const fog = makeFog();
-seedVision(fog);
+seedVision(fog, pCity, eCity);
 const cam = makeCamera();
 centerOn(cam, canvas);
 const eco = makeEconomy();
@@ -51,7 +44,6 @@ function logMsg(m) {
   if (logEl.children.length > 50) logEl.lastElementChild.remove();
 }
 
-// 招募按钮
 function recruitNow(type) {
   if (eco.money < ROST[type]) { logMsg("资金不足"); return; }
   const ok = doRecruit(eco, units, state.cityOwner, logMsg);
@@ -61,7 +53,6 @@ document.getElementById("recInf").onclick = () => recruitNow("infantry");
 document.getElementById("recTank").onclick = () => recruitNow("tank");
 document.getElementById("recFgh").onclick = () => recruitNow("fighter");
 
-// 暂停 / 倍速
 document.getElementById("pauseBtn").onclick = () => {
   paused = !paused;
   document.getElementById("pauseBtn").textContent = paused ? "继续" : "暂停";
@@ -70,6 +61,22 @@ document.getElementById("speedBtn").onclick = () => {
   speed = speed === 1 ? 2 : 1;
   document.getElementById("speedBtn").textContent = speed + "x";
 };
+
+// 小地图点击 -> 相机跳转
+let miniRes = null;
+canvas.addEventListener("click", (e) => {
+  const r = canvas.getBoundingClientRect();
+  const mx = (e.clientX - r.left) * (canvas.width / r.width);
+  const my = (e.clientY - r.top) * (canvas.height / r.height);
+  if (!miniRes) return;
+  if (mx < miniRes.mini && my < miniRes.mini) {
+    const p = minimapToWorld(mx, my, miniRes);
+    cam.offX = p.wx - canvas.width / 2;
+    cam.offY = p.wy - canvas.height / 2;
+    cam.keysLock = true;
+    clamp(cam, canvas);
+  }
+});
 
 function update(dt) {
   gTime += dt;
@@ -140,14 +147,14 @@ function loop(ts) {
     camStep(cam, keys, dt, canvas);
   }
   render(ctx, canvas, {
-    units: state.units,
-    fog, cam,
+    units: state.units, fog, cam,
     cityOwner: state.cityOwner,
-    selected: state.selected,
-    moveTarget: state.moveTarget,
-    dragBox: state.dragBox,
+    selected: state.selected, moveTarget: state.moveTarget, dragBox: state.dragBox,
   });
+  // 小地图（左上角）
+  miniRes = drawMinimap(ctx, cam, state, units, fog, canvas.width, canvas.height);
   updateUI();
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
