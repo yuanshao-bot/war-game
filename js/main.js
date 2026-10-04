@@ -4,7 +4,7 @@ import { makeUnit, resetUid, tickExposure, moveUnit, setPath } from "./unit.js";
 import { findTarget, fire } from "./combat.js";
 import { makeFog, refreshFog, ownerOf, seedVision } from "./fog.js";
 import { makeEconomy, tickIncome, addKillReward, recruit as doRecruit } from "./economy.js";
-import { think as aiThink } from "./ai.js";
+import { makeAI, think as aiThink } from "./ai.js";
 import { makeCamera, centerOn, follow, step as camStep, clamp } from "./camera.js";
 import { render } from "./render.js";
 import { attach } from "./input.js";
@@ -32,6 +32,7 @@ const state = { units, selected: null, moveTarget: null, dragBox: null, cityOwne
 const fog = makeFog();
 seedVision(fog, pCity, eCity);
 const cam = makeCamera();
+makeAI();
 centerOn(cam, canvas);
 const eco = makeEconomy();
 const keys = attach(canvas, state, cam);
@@ -90,7 +91,8 @@ function update(dt) {
   aiT += dt;
   if (aiT > AI.thinkSec) {
     aiT = 0;
-    aiThink(units);
+    const aiActs = aiThink(units, state.cityOwner);
+    for (const a of aiActs) if (a.startsWith("seize") || a === "retreat") logMsg("AI: " + a);
   }
   for (const u of units) {
     if (!u.alive) continue;
