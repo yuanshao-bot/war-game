@@ -47,7 +47,7 @@ export function render(ctx, canvas, state) {
         continue;
       }
       if (!fog.visible.has(k)) {
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillStyle = "rgba(60,60,60,0.55)"; // 探索后变灰而非纯黑
         ctx.fillRect(px, py, CS, CS);
       }
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
