@@ -1,4 +1,4 @@
-import { W, H, CS, UC, TERRAIN } from "./config.js";
+﻿import { W, H, CS, UC, TERRAIN } from "./config.js";
 import { allCities, terrAt } from "./map.js";
 import { stealthed } from "./unit.js";
 
