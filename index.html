@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh">
 <head>
 <meta charset="UTF-8">
@@ -122,7 +122,7 @@ let cityOwn=null;
 upFog();
 // 开局视野：点亮地图中央一带（相当于开局侦察到中心）
 (function seedVision(){
-  const ccx=Math.floor(W/2), ccy=Math.floor(H/2), R=12;
+  const ccx=Math.floor(W/2), ccy=Math.floor(H/2);
   for(let y=ccy-R;y<=ccy+R;y++)for(let x=ccx-R;x<=ccx+R;x++){
     if(x<0||x>=W||y<0||y>=H)continue;
     const k=x+","+y;
@@ -145,7 +145,7 @@ function moveUnit(u,dt){if(!u.path||!u.path.length)return;const t=u.path[0];cons
 function tryAttack(u){let tgt=null,best=Infinity;for(const e of units){if(!e.alive||e.owner===u.owner)continue;const d=dist(u,e);if(d>UC[u.type].range)continue;if(u.owner==="P"){const key=Math.round(e.x)+","+Math.round(e.y);if(!playerVis.has(key))continue;if(stealthed(e)&&d>1.6)continue;}if(d<best){best=d;tgt=e;}}if(!tgt)return;const tt=terrAt(Math.round(tgt.x),Math.round(tgt.y));const db=(T_DEF[tt]&&T_DEF[tt][tgt.type])||0;const dmg=effAtk(u)*(1-db)*(0.9+Math.random()*0.2);tgt.hp-=dmg;u.ammo--;u.cdTimer=UC[u.type].cd;if(tgt.hp<=0){tgt.alive=false;if(tgt.owner==="E"){money+=50;logMsg("玩家击毁敌方"+CN[tgt.type]+"！+50");}else logMsg("敌方击毁你的"+CN[tgt.type]+"！");}}
 function checkWin(){const p=units.filter(u=>u.owner==="P"&&u.alive).length,e=units.filter(u=>u.owner==="E"&&u.alive).length;const el=document.getElementById("winEl");if(!winDone){if(e===0){winDone=true;el.innerHTML=`<h1 style="color:#4caf50">胜利！消灭了所有敌方单位</h1>`;}else if(p===0){winDone=true;el.innerHTML=`<h1 style="color:#ef5350">失败！你的单位全被消灭</h1>`;}}}
 function aiThink(){for(const u of units){if(u.owner!=="E"||!u.alive)continue;const low=u.hp<u.maxHp*0.4||u.ammo<u.maxAmmo*0.3;if(low){let bestC=CITIES[0],bd=Infinity;for(const c of CITIES){const d=dist(u,c);if(d<bd){bd=d;bestC=c;}}setPath(u,bestC.x,bestC.y);continue;}let tgt=null,bd=Infinity;for(const p of units){if(p.owner!=="P"||!p.alive)continue;const d=dist(u,p);if(d<bd){bd=d;tgt=p;}}if(tgt)setPath(u,Math.round(tgt.x),Math.round(tgt.y));}}
-function recruit(type){if(money<ROST[type]){logMsg("资金不足");return;}const inCity=units.find(u=>u.owner==="P"&&u.alive&&isCity(Math.round(u.x),Math.round(u.y)));if(!inCity){logMsg("需要一名己方单位在城市内");return;}const ck=Math.round(inCity.x)+","+Math.round(inCity.y);const co=cityOwn?cityOwn[ck]:null;if(!co||co.owner!=="P"){logMsg("该城市不是你的，无法招募(归属:"+co.owner+")");return;}const c=CITIES.find(ct=>ct.x===Math.round(inCity.x)&&ct.y===Math.round(inCity.y));money-=ROST[type];units.push(mk(type,"P",c.x,c.y));logMsg("招募 "+CN[type]+" 于 (" + c.x + "," + c.y + ")");}
+function recruit(type){if(money<ROST[type]){logMsg("资金不足");return;}const inCity=units.find(u=>u.owner==="P"&&u.alive&&isCity(Math.round(u.x),Math.round(u.y)));if(!inCity){logMsg("需要一名己方单位在城市内");return;}const ck=Math.round(inCity.x)+","+Math.round(inCity.y);const co=cityOwn?cityOwn[ck]:null;if(!co||co.owner!=="P"){logMsg("该城市不是你的，无法招募(归属:"+((co&&co.owner)||"未知")+")");return;}const c=CITIES.find(ct=>ct.x===Math.round(inCity.x)&&ct.y===Math.round(inCity.y));money-=ROST[type];units.push(mk(type,"P",c.x,c.y));logMsg("招募 "+CN[type]+" 于 (" + c.x + "," + c.y + ")");}
 </script>
 <div id="winEl" style="margin-top:10px;text-align:center"></div>
 <script>
@@ -235,6 +235,7 @@ requestAnimationFrame(loop);
 </script>
 </body>
 </html>
+
 
 
 
