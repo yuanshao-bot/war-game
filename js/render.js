@@ -92,15 +92,18 @@ export function render(ctx, canvas, state) {
     ctx.fill();
   }
 
-  // 6) 移动目标连线
-  if (selected && selected.alive && moveTarget) {
-    const ux = selected.x * CS + CS / 2 - cx, uy = selected.y * CS + CS / 2 - cy;
+  // 6) 移动目标连线(多选: 每个单位各画一条到同一点; 框选虚线框见第 8 节)
+  if (selected && moveTarget) {
+    const grp = (Array.isArray(selected) ? selected : [selected]).filter(u => u.alive);
     const tx = moveTarget.x * CS + CS / 2 - cx, ty = moveTarget.y * CS + CS / 2 - cy;
     ctx.save();
     ctx.setLineDash([4, 3]);
-    ctx.strokeStyle = "rgba(79,195,247,0.7)";
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(ux, uy); ctx.lineTo(tx, ty); ctx.stroke();
+    for (const u of grp) {
+      const ux = u.x * CS + CS / 2 - cx, uy = u.y * CS + CS / 2 - cy;
+      ctx.strokeStyle = "rgba(79,195,247,0.7)";
+      ctx.beginPath(); ctx.moveTo(ux, uy); ctx.lineTo(tx, ty); ctx.stroke();
+    }
     ctx.setLineDash([]);
     ctx.strokeStyle = "rgba(79,195,247,0.9)";
     ctx.lineWidth = 1;
@@ -108,6 +111,7 @@ export function render(ctx, canvas, state) {
     ctx.fillStyle = "rgba(79,195,247,0.9)";
     ctx.beginPath(); ctx.arc(tx, ty, 3, 0, 7); ctx.fill();
     ctx.restore();
+  }
   }
 
   // 7) 单位
@@ -144,7 +148,7 @@ export function render(ctx, canvas, state) {
   if (dragBox && dragBox.moved) {
     const bx = Math.min(dragBox.px0, dragBox.px1), by = Math.min(dragBox.py0, dragBox.py1);
     const bw = Math.abs(dragBox.px1 - dragBox.px0), bh = Math.abs(dragBox.py1 - dragBox.py0);
-    ctx.strokeStyle = "#4fc3f7"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = "#4fc3f7"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
     ctx.strokeRect(bx - cx, by - cy, bw, bh);
     ctx.fillStyle = "rgba(79,195,247,0.08)";
     ctx.fillRect(bx - cx, by - cy, bw, bh);
