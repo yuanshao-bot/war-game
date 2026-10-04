@@ -27,7 +27,7 @@ export function attach(canvas, state, camera) {
     if (e.button !== 0) return;
     e.preventDefault();
     const p = local(e);
-    state.dragBox = { px0: p.px, py0: p.py, px1: p.px, py1: p.py, moved: false };
+    state.dragBox = { px0: p.px, py0: p.py, px1: p.px, py1: p.py, moved: false, t0: performance.now() };
   });
   canvas.addEventListener("mousemove", (e) => {
     if (!state.dragBox) return;
@@ -41,41 +41,39 @@ export function attach(canvas, state, camera) {
     if (!state.dragBox) return;
     const box = state.dragBox;
     state.dragBox = null;
-    if (box.moved) {
-      // 框选: 用 mouseup 时的相机偏移, 把像素框换算成世界格
-      const p = local(e);
-      const bx0 = Math.min(box.px0, p.px), bx1 = Math.max(box.px0, p.px);
-      const by0 = Math.min(box.py0, p.py), by1 = Math.max(box.py0, p.py);
-      const wx0 = bx0 + camera.offX, wx1 = bx1 + camera.offX;
-      const wy0 = by0 + camera.offY, wy1 = by1 + camera.offY;
-      const cx0 = Math.floor(wx0 / CS), cx1 = Math.ceil(wx1 / CS) - 1;
-      const cy0 = Math.floor(wy0 / CS), cy1 = Math.ceil(wy1 / CS) - 1;
-      const picked = state.units.filter((u) => {
-        if (u.owner !== "P" || !u.alive) return false;
-        const ux = u.x * CS + CS / 2, uy = u.y * CS + CS / 2;
-        return ux >= wx0 && ux <= wx1 && uy >= wy0 && uy <= wy1;
-      });
-      state.selected = picked.length === 0 ? null : picked.length === 1 ? picked[0] : picked;
-      state.moveTarget = null;
+    const p = local(e);
+    const quick = !box.moved || (performance.now() - (box.t0 || 0) < 250 && Math.abs(box.px1 - box.px0) < 6 && Math.abs(box.py1 - box.py0) < 6);
+    if (quick) {
+      const w = toWorld(p.px, p.py);
+      const gx = Math.floor(w.wx / CS), gy = Math.floor(w.wy / CS);
+      if (gx < 0 || gx >= W || gy < 0 || gy >= H) return;
+      const self = state.units.find((u) => u.owner === "P" && u.alive && Math.round(u.x) === gx && Math.round(u.y) === gy);
+      if (self) {
+        const isSel = Array.isArray(state.selected) ? state.selected.includes(self) : state.selected === self;
+        if (isSel) { state.selected = null; state.moveTarget = null; }
+        else { state.selected = self; state.moveTarget = null; }
+        return;
+      }
+      if (!state.selected) return;
+      const group = Array.isArray(state.selected) ? state.selected.filter((u) => u.alive) : [state.selected];
+      if (group.length === 0) { state.selected = null; return; }
+      for (const u of group) setPath(u, gx, gy, astar);
+      state.moveTarget = { x: gx, y: gy, group: true };
+      state.selected = group.length > 1 ? group : group[0];
       return;
     }
-    // 普通点击(未移动)
-    const p2 = local(e);
-    const w = toWorld(p2.px, p2.py);
-    const gx = Math.floor(w.wx / CS), gy = Math.floor(w.wy / CS);
-    if (gx < 0 || gx >= W || gy < 0 || gy >= H) return;
-    const self = state.units.find((u) => u.owner === "P" && u.alive && Math.round(u.x) === gx && Math.round(u.y) === gy);
-    if (self) {
-      state.selected = self;
-      state.moveTarget = null;
-      return;
-    }
-    if (!state.selected) return;
-    const group = Array.isArray(state.selected) ? state.selected.filter(u => u.alive) : [state.selected];
-    if (group.length === 0) { state.selected = null; return; }
-    for (const u of group) setPath(u, gx, gy, astar);
-    state.moveTarget = { x: gx, y: gy, group: true };
-    state.selected = group.length > 1 ? group : group[0];
+    // 拖框 => 框选
+    const bx0 = Math.min(box.px0, p.px), bx1 = Math.max(box.px0, p.px);
+    const by0 = Math.min(box.py0, p.py), by1 = Math.max(box.py0, p.py);
+    const wx0 = bx0 + camera.offX, wx1 = bx1 + camera.offX;
+    const wy0 = by0 + camera.offY, wy1 = by1 + camera.offY;
+    const picked = state.units.filter((u) => {
+      if (u.owner !== "P" || !u.alive) return false;
+      const ux = u.x * CS + CS / 2, uy = u.y * CS + CS / 2;
+      return ux >= wx0 && ux <= wx1 && uy >= wy0 && uy <= wy1;
+    });
+    state.selected = picked.length === 0 ? null : picked.length === 1 ? picked[0] : picked;
+    state.moveTarget = null;
   });
   return keys;
 }
