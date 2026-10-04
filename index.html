@@ -25,8 +25,8 @@ canvas{border:2px solid #4fc3f7;border-radius:4px;background:#000;cursor:crossha
   <span class="stat">资金: <b id="money">0</b></span>
   <span class="stat">时间: <b id="time">0:00</b></span>
   <span class="stat">玩家: <b id="pcount">0</b> | 敌方: <b id="ecount">0</b></span>
-  <button class="btn" id="pauseBtn" onclick="togglePause()">暂停</button>
-  <button class="btn" id="speedBtn" onclick="toggleSpeed()">1x</button>
+  <button class="btn" id="pauseBtn">暂停</button>
+  <button class="btn" id="speedBtn">1x</button>
 </div>
 <div id="layout">
 <canvas id="cv" width="720" height="720"></canvas>
@@ -34,243 +34,17 @@ canvas{border:2px solid #4fc3f7;border-radius:4px;background:#000;cursor:crossha
 <div id="panel">
   <div class="unit-info" id="selInfo">未选中<br>点击己方单位</div>
   <div class="unit-info">
-    <b>招募(需己方单位在城市)</b><br>
-    <button class="btn" onclick="recruit(&quot;infantry&quot;)">步兵 100</button>
-    <button class="btn" onclick="recruit(&quot;tank&quot;)">坦克 250</button>
-    <button class="btn" onclick="recruit(&quot;fighter&quot;)">战机 180</button>
-    <br><span style="font-size:10px;color:#888">城市内回血补弹 | 城市外久留战斗力降低</span>
+    <b>招募(需己方单位在己方城市)</b><br>
+    <button class="btn" id="recInf">步兵 100</button>
+    <button class="btn" id="recTank">坦克 250</button>
+    <button class="btn" id="recFgh">战机 180</button>
+    <br><span style="font-size:10px;color:#888">城市内回血补弹 | 城市外久留战斗力降低<br>WASD/方向键平移 | 拖动框选</span>
   </div>
 </div>
 </div>
+</div>
 <div class="log" id="log" style="width:100%;margin-top:8px"></div>
-<script>
-const CS=24,W=60,H=60;
-const cv=document.getElementById("cv"),ctx=cv.getContext("2d");
-const TERRAIN={plains:{name:"平原",color:"#8bc34a"},forest:{name:"森林",color:"#2e7d32"},desert:{name:"沙漠",color:"#e8c56d"},valley:{name:"山谷",color:"#6a8f8f"},city:{name:"城市",color:"#546e7a"}};
-const UC={infantry:{hp:100,atk:9,range:1.3,cd:0.8,ammo:20,speed:2.0,vision:2.5},tank:{hp:180,atk:18,range:2.6,cd:2.0,ammo:12,speed:1.5,vision:3.5},fighter:{hp:90,atk:14,range:5.0,cd:1.2,ammo:15,speed:3.2,vision:7.0}};
-const T_ATK={tank:{plains:1.3,forest:0.7,valley:1,desert:1,city:1.1},infantry:{plains:1,forest:1.1,valley:1,desert:1,city:1},fighter:{plains:1,forest:1,valley:1,desert:1,city:1}};
-const T_DEF={forest:{infantry:0.4,tank:0.1},valley:{infantry:0.25,tank:0.25,fighter:0.25},city:{infantry:0.15,tank:0.15,fighter:0.15}};
-const MC={fighter:()=>0.7,tank:t=>({forest:2,plains:0.7,valley:1.3,desert:1.2,city:1}[t]),infantry:t=>({forest:1.2,plains:1,valley:1.4,desert:1.3,city:1}[t])};
-const ROST={infantry:100,tank:250,fighter:180};
-const CN={infantry:"步兵",tank:"坦克",fighter:"战机"};
-function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-const rng=mulberry32(42);
-const map=Array.from({length:H},()=>Array(W).fill("plains"));
-const macroT=["plains","forest","desert","valley","plains","forest"];
-for(let my=0;my<12;my++)for(let mx=0;mx<12;mx++){const t=macroT[(mx*7+my*3)%macroT.length];for(let y=my*5;y<my*5+5&&y<H;y++)for(let x=mx*5;x<mx*5+5&&x<W;x++){if(rng()<0.85)map[y][x]=t;}}
-// 随机分布多个城市（偏向地图中心）
-const CITIES=[];
-(function genCities(){
-  const crng=mulberry32(7);
-  const minDist=7;
-  const ccx=Math.floor(W/2), ccy=Math.floor(H/2);
-  let tries=0;
-  // 中央先放一个
-  CITIES.push({x:ccx,y:ccy});
-  while(CITIES.length<14 && tries<800){
-    tries++;
-    const cx=2+Math.floor(crng()*(W-4));
-    const cy=2+Math.floor(crng()*(H-4));
-    if(CITIES.some(c=>Math.abs(c.x-cx)<minDist&&Math.abs(c.y-cy)<minDist))continue;
-    CITIES.push({x:cx,y:cy});
-  }
-  CITIES.forEach(setCity);
-})();
-function setCity(c){for(let y=c.y-1;y<=c.y+1;y++)for(let x=c.x-1;x<=c.x+1;x++)if(x>=0&&x<W&&y>=0&&y<H)map[y][x]="city";}
-function terrAt(x,y){return map[y]&&map[y][x]?map[y][x]:"plains";}
-function isCity(x,y){return terrAt(x,y)==="city";}
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-let units=[],uid=0;
-function mk(type,owner,x,y){const c=UC[type];return{id:uid++,type,owner,x,y,hp:c.hp,maxHp:c.hp,ammo:c.ammo,maxAmmo:c.ammo,exposure:0,cdTimer:0,path:null,alive:true};}
-function startGame(){
-  uid=0;units=[];
-  // 玩家选最下方的城市部署，敌方选最上方的城市部署
-  const sorted=[...CITIES].sort((a,b)=>a.y-b.y);
-  const pCity=sorted[sorted.length-1];
-  const eCity=sorted[0];
-  units.push(
-    mk("infantry","P",pCity.x,pCity.y),
-    mk("tank","P",pCity.x+1,pCity.y),
-    mk("fighter","P",pCity.x,pCity.y-1),
-    mk("infantry","E",eCity.x,eCity.y),
-    mk("tank","E",eCity.x-1,eCity.y),
-    mk("fighter","E",eCity.x,eCity.y+1)
-  );
-}
-startGame();
-let money=200,gTime=0,paused=false,speed=1,selected=null,moveTarget=null,playerVis=new Set(),playerExp=new Set(),aiT=0,visT=0,winDone=false,dragBox=null,dragMoved=false,camX=0,camY=0,offX=0,offY=0,keysLock=false;
-const keys={};
-window.addEventListener("keydown",e=>{keys[e.key]=true;if(e.key==="w"||e.key==="a"||e.key==="s"||e.key==="d"||e.key.startsWith("Arrow"))keysLock=true;});
-window.addEventListener("keyup",e=>{keys[e.key]=false;});
-function camStep(dt){const spd=500*(keys["ShiftLeft"]||keys["ShiftRight"]?2:1)*dt;if(keys["w"]||keys["ArrowUp"])offY-=spd;if(keys["s"]||keys["ArrowDown"])offY+=spd;if(keys["a"]||keys["ArrowLeft"])offX-=spd;if(keys["d"]||keys["ArrowRight"])offX+=spd;clampCam();}
-const logEl=document.getElementById("log");
-function logMsg(m){logEl.innerHTML="<div>"+m+"</div>"+logEl.innerHTML;if(logEl.children.length>50)logEl.lastElementChild.remove();}
-function calcVis(side){const v=new Set();for(const u of units){if(!u.alive||u.owner!==side)continue;const r=UC[u.type].vision;for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(Math.hypot(x-u.x,y-u.y)<=r)v.add(x+","+y);}}return v;}
-function upFog(){playerVis=calcVis("P");playerVis.forEach(k=>playerExp.add(k));seedSet.forEach(k=>{playerVis.add(k);playerExp.add(k);});cityOwn=cityOwner();}
-let seedSet=new Set();
-// 城市归属：统计城内各边存活单位数
-function cityOwner(){
-  const res={};
-  for(const c of CITIES){
-    let p=0,e=0;
-    for(const u of units){if(!u.alive)continue;const cx=Math.round(u.x),cy=Math.round(u.y);if(terrAt(cx,cy)!=="city")continue;const nc=CITIES.find(cc=>cc.x===cx&&cc.y===cy);if(nc&&nc===c){if(u.owner==="P")p++;else e++;}}
-    res[c.x+","+c.y]={p,e,owner:p>e?"P":(e>p?"E":"neutral")};
-  }
-  return res;
-}
-let cityOwn=null;
-upFog();
-// 开局视野：点亮地图中央一带（相当于开局侦察到中心）
-(function seedVision(){
-  const ccx=Math.floor(W/2), ccy=Math.floor(H/2);
-  for(let y=ccy-R;y<=ccy+R;y++)for(let x=ccx-R;x<=ccx+R;x++){
-    if(x<0||x>=W||y<0||y>=H)continue;
-    const k=x+","+y;
-    playerExp.add(k);
-    // 中央一带直接点亮
-    if(Math.abs(x-ccx)<=12&&Math.abs(y-ccy)<=12){playerVis.add(k);seedSet.add(k);}
-  }
-})();
-function mCost(type,tx,ty){if(tx<0||tx>=W||ty<0||ty>=H)return Infinity;return MC[type](terrAt(tx,ty));}
-function astar(u,tx,ty){const sx=Math.round(u.x),sy=Math.round(u.y);if(sx===tx&&sy===ty)return null;const open=[{x:sx,y:sy,g:0,f:0,path:[]}];const gS=new Map();gS.set(sx+","+sy,0);const closed=new Set();let it=0;while(open.length&&it<1500){it++;open.sort((a,b)=>a.f-b.f);const cur=open.shift();const k=cur.x+","+cur.y;if(closed.has(k))continue;closed.add(k);if(cur.x===tx&&cur.y===ty)return cur.path;for(const dir of[[1,0],[-1,0],[0,1],[0,-1]]){const nx=cur.x+dir[0],ny=cur.y+dir[1];if(nx<0||nx>=W||ny<0||ny>=H)continue;const c=mCost(u.type,nx,ny);if(c===Infinity)continue;const nk=nx+","+ny;const ng=cur.g+c;if(gS.has(nk)&&ng>=gS.get(nk))continue;gS.set(nk,ng);open.push({x:nx,y:ny,g:ng,f:ng+Math.max(Math.abs(tx-nx),Math.abs(ty-ny))*0.9,path:cur.path.concat([{x:nx,y:ny}])});}}return null;}
-function setPath(u,tx,ty){u.path=astar(u,tx,ty);if(u===selected)moveTarget={x:tx,y:ty};}
-function effAtk(u){const t=terrAt(Math.round(u.x),Math.round(u.y));return UC[u.type].atk*(1-u.exposure*0.5)*(T_ATK[u.type][t]||1);}
-function stealthed(u){return u.type==="infantry"&&terrAt(Math.round(u.x),Math.round(u.y))==="forest";}
-function clampCam(){const VW=cv.width,VH=cv.height;const mx=Math.max(0,W*CS-VW),my=Math.max(0,H*CS-VH);if(offX>mx)offX=mx;if(offY>my)offY=my;if(offX<0)offX=0;if(offY<0)offY=0;}
-offX=Math.floor((W*CS-cv.width)/2);offY=Math.floor((H*CS-cv.height)/2);clampCam();
-let lastTs=0;
-function loop(ts){const dt=Math.min(0.05,((ts-lastTs)/1000||0)*speed);lastTs=ts;if(!paused){update(dt);camStep(dt);}render();updateUI();requestAnimationFrame(loop);}
-function update(dt){gTime+=dt;money+=dt*10;visT+=dt;if(visT>0.3){visT=0;upFog();}aiT+=dt;if(aiT>0.4){aiT=0;aiThink();}for(const u of units){if(!u.alive)continue;const uk=Math.round(u.x)+","+Math.round(u.y);const co=cityOwn?cityOwn[uk]:null;const inCity=isCity(Math.round(u.x),Math.round(u.y));if(inCity&&co&&co.owner===u.owner){u.exposure=Math.max(0,u.exposure-dt*0.15);u.hp=Math.min(u.maxHp,u.hp+dt*20);u.ammo=Math.min(u.maxAmmo,u.ammo+dt*3);}else if(inCity){u.exposure=Math.min(1,u.exposure+dt*0.02);}else{u.exposure=Math.min(1,u.exposure+dt*0.03);}moveUnit(u,dt);u.cdTimer-=dt;if(u.cdTimer<=0&&u.ammo>=1)tryAttack(u);}checkWin();}
-function moveUnit(u,dt){if(!u.path||!u.path.length)return;const t=u.path[0];const dx=t.x-u.x,dy=t.y-u.y;const d=Math.hypot(dx,dy);const c=MC[u.type](terrAt(Math.round(t.x),Math.round(t.y)));const step=UC[u.type].speed*dt/c;if(d<=step||d<0.001){u.x=t.x;u.y=t.y;u.path.shift();}else{u.x+=dx/d*step;u.y+=dy/d*step;}}
-function tryAttack(u){let tgt=null,best=Infinity;for(const e of units){if(!e.alive||e.owner===u.owner)continue;const d=dist(u,e);if(d>UC[u.type].range)continue;if(u.owner==="P"){const key=Math.round(e.x)+","+Math.round(e.y);if(!playerVis.has(key))continue;if(stealthed(e)&&d>1.6)continue;}if(d<best){best=d;tgt=e;}}if(!tgt)return;const tt=terrAt(Math.round(tgt.x),Math.round(tgt.y));const db=(T_DEF[tt]&&T_DEF[tt][tgt.type])||0;const dmg=effAtk(u)*(1-db)*(0.9+Math.random()*0.2);tgt.hp-=dmg;u.ammo--;u.cdTimer=UC[u.type].cd;if(tgt.hp<=0){tgt.alive=false;if(tgt.owner==="E"){money+=50;logMsg("玩家击毁敌方"+CN[tgt.type]+"！+50");}else logMsg("敌方击毁你的"+CN[tgt.type]+"！");}}
-function checkWin(){const p=units.filter(u=>u.owner==="P"&&u.alive).length,e=units.filter(u=>u.owner==="E"&&u.alive).length;const el=document.getElementById("winEl");if(!winDone){if(e===0){winDone=true;el.innerHTML=`<h1 style="color:#4caf50">胜利！消灭了所有敌方单位</h1>`;}else if(p===0){winDone=true;el.innerHTML=`<h1 style="color:#ef5350">失败！你的单位全被消灭</h1>`;}}}
-function aiThink(){for(const u of units){if(u.owner!=="E"||!u.alive)continue;const low=u.hp<u.maxHp*0.4||u.ammo<u.maxAmmo*0.3;if(low){let bestC=CITIES[0],bd=Infinity;for(const c of CITIES){const d=dist(u,c);if(d<bd){bd=d;bestC=c;}}setPath(u,bestC.x,bestC.y);continue;}let tgt=null,bd=Infinity;for(const p of units){if(p.owner!=="P"||!p.alive)continue;const d=dist(u,p);if(d<bd){bd=d;tgt=p;}}if(tgt)setPath(u,Math.round(tgt.x),Math.round(tgt.y));}}
-function recruit(type){if(money<ROST[type]){logMsg("资金不足");return;}const inCity=units.find(u=>u.owner==="P"&&u.alive&&isCity(Math.round(u.x),Math.round(u.y)));if(!inCity){logMsg("需要一名己方单位在城市内");return;}const ck=Math.round(inCity.x)+","+Math.round(inCity.y);const co=cityOwn?cityOwn[ck]:null;if(!co||co.owner!=="P"){logMsg("该城市不是你的，无法招募(归属:"+((co&&co.owner)||"未知")+")");return;}const c=CITIES.find(ct=>ct.x===Math.round(inCity.x)&&ct.y===Math.round(inCity.y));money-=ROST[type];units.push(mk(type,"P",c.x,c.y));logMsg("招募 "+CN[type]+" 于 (" + c.x + "," + c.y + ")");}
-</script>
 <div id="winEl" style="margin-top:10px;text-align:center"></div>
-<script>
-function render(){
-  const VW=cv.width, VH=cv.height;
-  // 相机跟随选中单位（未用键盘平移时）
-  const focusUnit=(selected&&!Array.isArray(selected)&&selected.alive)?selected:null;
-  if(focusUnit&&!keysLock){offX=focusUnit.x*CS+CS/2-VW/2;offY=focusUnit.y*CS+CS/2-VH/2;clampCam();}
-  clampCam();
-  const cx=offX, cy=offY;
-  const ox=Math.floor(cx/CS),oy=Math.floor(cy/CS);
-  const x0=ox,x1=Math.min(W-1,Math.floor((VW-cx)/CS));
-  const y0=oy,y1=Math.min(H-1,Math.floor((VH-cy)/CS));
-  ctx.clearRect(0,0,VW,VH);
-  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const c=CS*x-cx,cy2=CS*y-cy;const k=x+","+y;ctx.fillStyle=TERRAIN[terrAt(x,y)].color;ctx.fillRect(c,cy2,CS,CS);
-if(!playerExp.has(k)){ctx.fillStyle="#000";ctx.fillRect(c,cy,CS,CS);continue;}
-if(!playerVis.has(k)){ctx.fillStyle="rgba(0,0,0,0.55)";ctx.fillRect(c,cy,CS,CS);}
-ctx.strokeStyle="rgba(0,0,0,0.15)";ctx.strokeRect(c,cy,CS,CS);}
-// 城市边框(按归属) - 仅当城市中心格已探索或可见时才画
-if(cityOwn){for(const c of CITIES){const ck=c.x+","+c.y;const o=cityOwn[ck];if(!o)continue;if(!playerExp.has(ck)&&!playerVis.has(ck))continue;let bx=(c.x-1)*CS-offX,by=(c.y-1)*CS-offY,bw=CS*3-2,bh=CS*3-2;if(bx<0){bw-= -bx;bx=0;}if(by<0){bh-= -by;by=0;}if(bx+bw>W*CS-offX){bw=W*CS-offX-bx;}if(by+bh>H*CS-offY){bh=H*CS-offY-by;}if(bw<=0||bh<=0)continue;ctx.strokeStyle=o.owner==="P"?"#4fc3f7":(o.owner==="E"?"#ef5350":"#888");ctx.lineWidth=2;ctx.strokeRect(bx+1,by+1,bw,bh);ctx.lineWidth=1;}}
-if(selected&&!Array.isArray(selected)&&selected.alive){const r=UC[selected.type].range*CS;ctx.beginPath();ctx.arc(selected.x*CS+CS/2-offX,selected.y*CS+CS/2-offY,r,0,7);ctx.strokeStyle="rgba(79,195,247,0.5)";ctx.lineWidth=2;ctx.stroke();ctx.fillStyle="rgba(79,195,247,0.08)";ctx.fill();}
-// 移动目标连线
-if(selected&&selected.alive&&moveTarget){
-  const ux=selected.x*CS+CS/2-offX,uy=selected.y*CS+CS/2-offY;
-  const tx=moveTarget.x*CS+CS/2-offX,ty=moveTarget.y*CS+CS/2-offY;
-  ctx.save();
-  ctx.setLineDash([4,3]);
-  ctx.strokeStyle="rgba(79,195,247,0.7)";
-  ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(ux,uy);ctx.lineTo(tx,ty);ctx.stroke();
-  // 目标格标记
-  ctx.setLineDash([]);
-  ctx.strokeStyle="rgba(79,195,247,0.9)";
-  ctx.lineWidth=1;
-  ctx.strokeRect(moveTarget.x*CS+2,moveTarget.y*CS+2,CS-4,CS-4);
-  ctx.fillStyle="rgba(79,195,247,0.9)";
-  ctx.beginPath();ctx.arc(tx,ty,3,0,7);ctx.fill();
-  ctx.restore();
-}
-for(const u of units){if(!u.alive)continue;
-if(u.owner==="E"&&!playerVis.has(Math.round(u.x)+","+Math.round(u.y)))continue;
-const px=u.x*CS+CS/2-offX,py=u.y*CS+CS/2-offY;
-ctx.fillStyle=u.owner==="P"?"#4fc3f7":"#ef5350";
-if(u.type==="infantry"){ctx.fillRect(px-5,py-5,10,10);}
-else if(u.type==="tank"){ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.fill();}
-else{ctx.beginPath();ctx.moveTo(px,py-9);ctx.lineTo(px+9,py+7);ctx.lineTo(px-9,py+7);ctx.closePath();ctx.fill();}
-const hw=18;ctx.fillStyle="#000";ctx.fillRect(px-hw/2,py-14,hw,4);ctx.fillStyle=u.owner==="P"?"#4caf50":"#ff9800";ctx.fillRect(px-hw/2,py-14,hw*(u.hp/u.maxHp),4);
-ctx.fillStyle="#000";ctx.fillRect(px-hw/2,py+10,hw,3);ctx.fillStyle="#e0e0e0";ctx.fillRect(px-hw/2,py+10,hw*(u.ammo/u.maxAmmo),3);
-if(u===selected){ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.strokeRect(u.x*CS+1,u.y*CS+1,CS-2,CS-2);}
-if(stealthed(u)&&u.owner==="E"){ctx.fillStyle="rgba(255,255,255,0.8)";ctx.font="10px monospace";ctx.fillText("?",px-3,py+24);}}
-// 多选高亮
-if(Array.isArray(selected)){for(const u of selected){if(!u.alive)continue;ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.strokeRect(u.x*CS+1,u.y*CS+1,CS-2,CS-2);}}
-// 框选矩形
-if(dragBox&&dragMoved){const bx=Math.min(dragBox.x0,dragBox.x1),by=Math.min(dragBox.y0,dragBox.y1),bw=Math.abs(dragBox.x1-dragBox.x0),bh=Math.abs(dragBox.y1-dragBox.y0);ctx.strokeStyle="#4fc3f7";ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.strokeRect(bx,by,bw,bh);ctx.fillStyle="rgba(79,195,247,0.08)";ctx.fillRect(bx,by,bw,bh);ctx.setLineDash([]);}
-}
-function updateUI(){document.getElementById("money").textContent=Math.floor(money);const s=Math.floor(gTime);document.getElementById("time").textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");document.getElementById("pcount").textContent=units.filter(u=>u.owner==="P"&&u.alive).length;document.getElementById("ecount").textContent=units.filter(u=>u.owner==="E"&&u.alive).length;const info=document.getElementById("selInfo");if(selected&&!Array.isArray(selected)&&selected.alive){const t=terrAt(Math.round(selected.x),Math.round(selected.y));info.innerHTML="<b>"+CN[selected.type]+"</b><br>HP:"+Math.round(selected.hp)+"<br>弹药:"+Math.floor(selected.ammo)+"/"+selected.maxAmmo+"<br>地形:"+TERRAIN[t].name+"<br>战斗力:"+(Math.round((1-selected.exposure*0.5)*100))+"%";}else info.innerHTML="未选中<br>点击己方单位";}
-function togglePause(){paused=!paused;document.getElementById("pauseBtn").textContent=paused?"继续":"暂停";}
-function toggleSpeed(){speed=speed===1?2:1;document.getElementById("speedBtn").textContent=speed+"x";}
-function cvPx(e){const r=cv.getBoundingClientRect();return{px:(e.clientX-r.left)*(cv.width/r.width),py:(e.clientY-r.top)*(cv.height/r.height)};}
-function cvWorld(e){const p=cvPx(e);return{px:p.px,py:p.py,wx:p.px+offX,wy:p.py+offY};}
-cv.addEventListener("mousedown",e=>{if(e.button!==0)return;const p=cvPx(e);dragBox={px0:p.px,py0:p.py,wx0:p.px+offX,wy0:p.py+offY};dragMoved=false;});
-cv.addEventListener("mousemove",e=>{if(!dragBox)return;const p=cvPx(e);if(Math.abs(p.px-dragBox.px0)>6||Math.abs(p.py-dragBox.py0)>6)dragMoved=true;dragBox.wx1=p.px+offX;dragBox.wy1=p.py+offY;});
-cv.addEventListener("mouseup",e=>{if(!dragBox)return;const box=dragBox;dragBox=null;const p=cvPx(e);const mx=p.px+offX,my=p.py+offY;
-  if(dragMoved){ // 框选
-    const x0=Math.min(box.wx0,box.wx1),x1=Math.max(box.wx0,box.wx1),y0=Math.min(box.wy0,box.wy1),y1=Math.max(box.wy0,box.wy1);
-    const gx0=Math.floor(x0/CS),gx1=Math.floor(x1/CS),gy0=Math.floor(y0/CS),gy1=Math.floor(y1/CS);
-    const picked=units.filter(u=>u.owner==="P"&&u.alive&&Math.round(u.x)>=gx0&&Math.round(u.x)<=gx1&&Math.round(u.y)>=gy0&&Math.round(u.y)<=gy1);
-    if(picked.length===0){selected=null;moveTarget=null;}else if(picked.length===1){selected=picked[0];moveTarget=null;}else{selected=picked;moveTarget=null;}
-    return;
-  }
-  // 普通点击
-  const gx=Math.floor(mx/CS),gy=Math.floor(my/CS);
-  if(gx<0||gx>=W||gy<0||gy>=H)return;
-  const self=units.find(u=>u.owner==="P"&&u.alive&&Math.round(u.x)===gx&&Math.round(u.y)===gy);
-  if(self){selected=self;moveTarget=null;return;}
-  if(!selected||!selected.alive)return;
-  setPath(selected,gx,gy);
-  const x0=Math.min(box.x0,box.x1)/CS,x1=Math.max(box.x0,box.x1)/CS,y0=Math.min(box.y0,box.y1)/CS,y1=Math.max(box.y0,box.y1)/CS;
-  const picked=units.filter(u=>u.owner==="P"&&u.alive&&u.x>=x0&&u.x<=x1&&u.y>=y0&&u.y<=y1);
-  if(picked.length===0){selected=null;moveTarget=null;}
-  else if(picked.length===1){selected=picked[0];moveTarget=null;}
-  else{selected=picked;moveTarget=null;} // 多选
-});
-// 键盘控制相机平移
-
-requestAnimationFrame(loop);
-</script>
+<script type="module" src="./js/main.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
