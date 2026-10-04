@@ -41,9 +41,13 @@ let gTime = 0, paused = false, speed = 1, visT = 0, aiT = 0, winDone = false, la
 
 const logEl = document.getElementById("log");
 function logMsg(m) {
+  // 同类日志 2s 去重, 避免刷屏
+  if (m === lastLog && Date.now() - lastLogT < 2000) { lastLogT = Date.now(); return; }
+  lastLog = m; lastLogT = Date.now();
   logEl.innerHTML = "<div>" + m + "</div>" + logEl.innerHTML;
-  if (logEl.children.length > 50) logEl.lastElementChild.remove();
+  if (logEl.children.length > 80) logEl.lastElementChild.remove();
 }
+let lastLog = "", lastLogT = 0;
 
 function recruitNow(type) {
   if (eco.money < ROST[type]) { logMsg("资金不足(" + ROST[type] + ")"); return; }
@@ -64,6 +68,14 @@ function recruitNow(type) {
   logMsg("你所在的城市都不是你的(需己方城市归属P才能招募)");
 }
 document.getElementById("recInf").onclick = () => recruitNow("infantry");
+// 日志折叠
+document.getElementById("logToggle").onclick = () => {
+  const el = document.getElementById("log");
+  const t = document.getElementById("logToggle");
+  const hidden = el.style.display === "none";
+  el.style.display = hidden ? "" : "none";
+  t.textContent = hidden ? "▼ 日志(点击收起)" : "▶ 日志(已收起, 点击展开)";
+};
 document.getElementById("recTank").onclick = () => recruitNow("tank");
 document.getElementById("recFgh").onclick = () => recruitNow("fighter");
 
@@ -104,8 +116,7 @@ function update(dt) {
   aiT += dt;
   if (aiT > AI.thinkSec) {
     aiT = 0;
-    const aiActs = aiThink(units, state.cityOwner);
-    for (const a of aiActs) if (a.startsWith("seize") || a === "retreat") logMsg("AI: " + a);
+    aiThink(units, state.cityOwner);
   }
   for (const u of units) {
     if (!u.alive) continue;
