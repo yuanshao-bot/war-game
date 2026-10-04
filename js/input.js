@@ -70,9 +70,12 @@ export function attach(canvas, state, camera) {
       state.moveTarget = null;
       return;
     }
-    if (!state.selected || !state.selected.alive) return;
-    setPath(state.selected, gx, gy, astar);
-    state.moveTarget = { x: gx, y: gy };
+    if (!state.selected) return;
+    const group = Array.isArray(state.selected) ? state.selected.filter(u => u.alive) : [state.selected];
+    if (group.length === 0) { state.selected = null; return; }
+    for (const u of group) setPath(u, gx, gy, astar);
+    state.moveTarget = { x: gx, y: gy, group: true };
+    state.selected = group.length > 1 ? group : group[0];
   });
   return keys;
 }
