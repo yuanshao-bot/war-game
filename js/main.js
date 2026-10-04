@@ -157,7 +157,7 @@ function loop(ts) {
     update(dt);
     // 跟随: 只有"单击选中且仍在移动中"的单位才跟; 多选/拖动框选/选中单位已到达路径终点 => 不跟(避免相机回跳)
   const sel = state.selected;
-  const focusUnit = (!Array.isArray(sel) && sel && sel.alive && sel.path && sel.path.length > 0) ? sel : null;
+  const focusUnit = (!Array.isArray(sel) && sel && sel.alive) ? sel : null;
   follow(cam, focusUnit, canvas);
     camStep(cam, keys, dt, canvas);
   }
