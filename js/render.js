@@ -1,44 +1,47 @@
-import { W, H, CS, UC, TERRAIN, CN } from "./config.js";
-import { allCities, isCity, terrAt } from "./map.js";
+import { W, H, CS, UC, TERRAIN } from "./config.js";
+import { allCities, terrAt } from "./map.js";
 import { stealthed } from "./unit.js";
 
-// 渲染状态：selected / moveTarget / dragBox / cityOwner
 export function render(ctx, canvas, state) {
   const { units, fog, cam, cityOwner, selected, moveTarget, dragBox } = state;
   const VW = canvas.width, VH = canvas.height;
   const cx = cam.offX, cy = cam.offY;
+
+  // 1) 整块填黑底（地图外画布区域保持黑）
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, VW, VH);
+
+  // 2) 视口内地图格范围
   const x0 = Math.max(0, Math.floor(cx / CS));
   const y0 = Math.max(0, Math.floor(cy / CS));
   const x1 = Math.min(W - 1, Math.floor((VW - cx) / CS));
   const y1 = Math.min(H - 1, Math.floor((VH - cy) / CS));
-  ctx.clearRect(0, 0, VW, VH);
 
-  // 地形 + 迷雾
+  // 3) 地形 + 迷雾
   for (let y = y0; y <= y1; y++)
     for (let x = x0; x <= x1; x++) {
-      const c = CS * x - cx, c2 = CS * y - cy;
+      const px = CS * x - cx, py = CS * y - cy;
       const k = x + "," + y;
       ctx.fillStyle = TERRAIN[terrAt(x, y)].color;
-      ctx.fillRect(c, c2, CS, CS);
+      ctx.fillRect(px, py, CS, CS);
       if (!fog.explored.has(k)) {
         ctx.fillStyle = "#000";
-        ctx.fillRect(c, c2, CS, CS);
+        ctx.fillRect(px, py, CS, CS);
         continue;
       }
       if (!fog.visible.has(k)) {
         ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillRect(c, c2, CS, CS);
+        ctx.fillRect(px, py, CS, CS);
       }
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
-      ctx.strokeRect(c, c2, CS, CS);
+      ctx.strokeRect(px, py, CS, CS);
     }
 
-  // 城市边框（仅当该城市 3x3 全部已探索/可见时才画，避免黑雾露出）
+  // 4) 城市边框（仅 3x3 全可见才画）
   for (const c of allCities()) {
     const ck = c.x + "," + c.y;
     const o = cityOwner ? cityOwner[ck] : null;
     if (!o) continue;
-    // 检查 3x3 是否全部可见
     let lit = 0;
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
@@ -46,13 +49,13 @@ export function render(ctx, canvas, state) {
         if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
         if (fog.visible.has(nx + "," + ny)) lit++;
       }
-    if (lit < 9) continue; // 没全亮就不画边框
+    if (lit < 9) continue;
     let bx = (c.x - 1) * CS - cx, by = (c.y - 1) * CS - cy;
     let bw = CS * 3 - 2, bh = CS * 3 - 2;
     if (bx < 0) { bw -= -bx; bx = 0; }
     if (by < 0) { bh -= -by; by = 0; }
-    if (bx + bw > W * CS - cx) bw = W * CS - cx - bx;
-    if (by + bh > H * CS - cy) bh = H * CS - cy - by;
+    if (bx + bw > VW) bw = VW - bx;
+    if (by + bh > VH) bh = VH - by;
     if (bw <= 0 || bh <= 0) continue;
     ctx.strokeStyle = o.owner === "P" ? "#4fc3f7" : o.owner === "E" ? "#ef5350" : "#888";
     ctx.lineWidth = 2;
@@ -60,7 +63,7 @@ export function render(ctx, canvas, state) {
     ctx.lineWidth = 1;
   }
 
-  // 选中范围圈（单选）
+  // 5) 选中范围圈（单选）
   if (selected && !Array.isArray(selected) && selected.alive) {
     const r = UC[selected.type].range * CS;
     ctx.beginPath();
@@ -72,7 +75,7 @@ export function render(ctx, canvas, state) {
     ctx.fill();
   }
 
-  // 移动目标连线
+  // 6) 移动目标连线
   if (selected && selected.alive && moveTarget) {
     const ux = selected.x * CS + CS / 2 - cx, uy = selected.y * CS + CS / 2 - cy;
     const tx = moveTarget.x * CS + CS / 2 - cx, ty = moveTarget.y * CS + CS / 2 - cy;
@@ -90,7 +93,7 @@ export function render(ctx, canvas, state) {
     ctx.restore();
   }
 
-  // 单位
+  // 7) 单位
   for (const u of units) {
     if (!u.alive) continue;
     if (u.owner === "E" && !fog.visible.has(Math.round(u.x) + "," + Math.round(u.y))) continue;
@@ -120,7 +123,7 @@ export function render(ctx, canvas, state) {
     }
   }
 
-  // 框选矩形
+  // 8) 框选矩形
   if (dragBox && dragBox.moved) {
     const bx = Math.min(dragBox.px0, dragBox.px1), by = Math.min(dragBox.py0, dragBox.py1);
     const bw = Math.abs(dragBox.px1 - dragBox.px0), bh = Math.abs(dragBox.py1 - dragBox.py0);
@@ -131,4 +134,3 @@ export function render(ctx, canvas, state) {
     ctx.setLineDash([]);
   }
 }
-
