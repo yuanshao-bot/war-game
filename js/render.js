@@ -14,8 +14,8 @@ export function render(ctx, canvas, state) {
   // 2) 视口内地图格范围
   const x0 = Math.max(0, Math.floor(cx / CS));
   const y0 = Math.max(0, Math.floor(cy / CS));
-  const x1 = Math.min(W - 1, Math.floor((VW - cx) / CS));
-  const y1 = Math.min(H - 1, Math.floor((VH - cy) / CS));
+  const x1 = Math.min(W - 1, Math.ceil((cx + VW) / CS) - 1);
+  const y1 = Math.min(H - 1, Math.ceil((cy + VH) / CS) - 1);
 
   // 诊断: 若视口内无任何可见格子, 输出原因并强制点亮中心, 避免全黑
   let _litCount = 0;
