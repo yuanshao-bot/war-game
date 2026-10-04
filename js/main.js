@@ -16,7 +16,7 @@ const ctx = canvas.getContext("2d");
 resetUid();
 
 const sorted = [...allCities()].sort((a, b) => a.y - b.y);
-const pCity = sorted[sorted.length - 1];
+const pCity = sorted[Math.floor(sorted.length / 2)];
 const eCity = sorted[0];
 const units = [
   makeUnit("infantry", "P", pCity.x, pCity.y),
