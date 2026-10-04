@@ -1,4 +1,4 @@
-﻿# 实时战争游戏 (Real-time War Game)
+# 实时战争游戏 (Real-time War Game)
 
 纯 HTML / Canvas / JS 多模块实现的**实时制**策略战争游戏，无构建、无依赖。
 浏览器直接打开 `index.html` 即可玩，在线版: https://yuanshao-bot.github.io/war-game/
