@@ -5,7 +5,6 @@ export function makeFog() {
   return { visible: new Set(), explored: new Set(), seed: new Set() };
 }
 
-// 计算某方当前可见格
 export function calcVis(units, side) {
   const v = new Set();
   for (const u of units) {
@@ -18,7 +17,6 @@ export function calcVis(units, side) {
   return v;
 }
 
-// 城市归属：统计城内各边存活单位数
 export function ownerOf(units) {
   const res = {};
   for (const c of allCities()) {
@@ -36,22 +34,27 @@ export function ownerOf(units) {
   return res;
 }
 
-// 开局种子视野：点亮地图中央一带
-export function seedVision(fog) {
-  const ccx = Math.floor(W / 2), ccy = Math.floor(H / 2), R = FOG.seedRadius;
-  for (let y = ccy - R; y <= ccy + R; y++)
-    for (let x = ccx - R; x <= ccx + R; x++) {
-      if (x < 0 || x >= W || y < 0 || y >= H) continue;
-      const k = x + "," + y;
-      fog.explored.add(k);
-      if (Math.abs(x - ccx) <= R && Math.abs(y - ccy) <= R) {
-        fog.visible.add(k);
-        fog.seed.add(k);
+// 开局种子视野：点亮玩家基地 + 敌方基地 + 地图中央
+export function seedVision(fog, pCity, eCity) {
+  const centers = [];
+  if (pCity) centers.push(pCity);
+  if (eCity) centers.push(eCity);
+  centers.push({ x: Math.floor(W / 2), y: Math.floor(H / 2) });
+  const R = FOG.seedRadius;
+  for (const c of centers) {
+    for (let y = c.y - R; y <= c.y + R; y++)
+      for (let x = c.x - R; x <= c.x + R; x++) {
+        if (x < 0 || x >= W || y < 0 || y >= H) continue;
+        const k = x + "," + y;
+        fog.explored.add(k);
+        if (Math.abs(x - c.x) <= R && Math.abs(y - c.y) <= R) {
+          fog.visible.add(k);
+          fog.seed.add(k);
+        }
       }
-    }
+  }
 }
 
-// 每 0.3s 刷新玩家迷雾
 export function refreshFog(fog, units) {
   fog.visible = calcVis(units, "P");
   fog.visible.forEach((k) => fog.explored.add(k));
