@@ -13,7 +13,7 @@ h1{font-size:20px;margin-bottom:8px;color:#4fc3f7}
 .btn:hover{background:#1a5276}
 #panel{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center}
 .unit-info{background:#16213e;padding:8px;border-radius:6px;font-size:12px;min-width:150px}
-.log{background:#0d1b2a;padding:6px;border-radius:4px;font-size:11px;max-width:520px;margin-top:6px;max-height:80px;overflow-y:auto;font-family:monospace}
+.log{background:#0d1b2a;padding:6px;border-radius:4px;font-size:11px;margin-top:8px;max-height:220px;overflow-y:auto;font-family:monospace;white-space:pre-wrap;word-break:break-all}
 canvas{border:2px solid #4fc3f7;border-radius:4px;background:#000;cursor:crosshair;display:block}
 #layout{display:flex;gap:12px;align-items:flex-start}
 #right{min-width:230px;flex:1}
@@ -41,11 +41,12 @@ canvas{border:2px solid #4fc3f7;border-radius:4px;background:#000;cursor:crossha
     <br><span style="font-size:10px;color:#888">城市内回血补弹 | 城市外久留战斗力降低<br>WASD/方向键平移 | 拖动框选 | 点小地图跳转</span>
   </div>
 </div>
+<div style="margin-top:8px;font-size:11px;color:#4fc3f7;cursor:pointer;user-select:none" id="logToggle">▼ 日志(点击收起)</div>
+<div class="log" id="log"></div>
 </div>
 </div>
-<div class="log" id="log" style="width:100%;margin-top:8px"></div>
 <div id="winEl" style="margin-top:10px;text-align:center"></div>
-<script type="module" src="./js/main.js?v=1791100099"></script>
+<script type="module" src="./js/main.js?v=1791100123"></script>
 </body>
 </html>
 
