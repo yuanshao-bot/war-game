@@ -24,8 +24,8 @@ export function ownerOf(units) {
     for (const u of units) {
       if (!u.alive) continue;
       const cx = Math.round(u.x), cy = Math.round(u.y);
-      if (!isCity(cx, cy)) continue;
-      if (Math.abs(cx - c.x) <= 1 && Math.abs(cy - c.y) <= 1) {
+      // 城市区域 = 城心 3x3, 与 isCity 一致; 边缘 1 格内的单位也计入归属
+      if (Math.abs(cx - c.x) <= 2 && Math.abs(cy - c.y) <= 2 && isCity(cx, cy)) {
         if (u.owner === "P") p++; else e++;
       }
     }
